@@ -1,0 +1,28 @@
+<idea-plugin>
+    <id>dev.autocomplete.local</id>
+    <name>Local LLM Autocomplete</name>
+    <vendor>local</vendor>
+
+    <description><![CDATA[
+        Inline code autocomplete powered by a locally-running Ollama model
+        (default: qwen2.5-coder). No cloud, no telemetry.
+    ]]></description>
+
+    <!-- Platform-only dependency: loads in every IntelliJ-Platform IDE
+         (IntelliJ IDEA, PyCharm, WebStorm, GoLand, RubyMine, CLion, ...). -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <inline.completion.provider
+            implementation="dev.autocomplete.adapters.intellij.OllamaInlineCompletionProvider"/>
+
+        <applicationService
+            serviceImplementation="dev.autocomplete.adapters.intellij.SettingsState"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            id="dev.autocomplete.settings"
+            displayName="Local LLM Autocomplete"
+            instance="dev.autocomplete.adapters.intellij.SettingsConfigurable"/>
+    </extensions>
+</idea-plugin>
