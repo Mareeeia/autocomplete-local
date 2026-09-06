@@ -22,6 +22,8 @@ class SettingsState : PersistentStateComponent<SettingsState.Data>, Settings {
         var maxTokens: Int = 128
         var maxLines: Int = 5
         var enabledLanguageIdsCsv: String = ""
+        var trackTokenUsage: Boolean = true
+        var tokenUsageReportEvery: Int = 25
     }
 
     private var data = Data()

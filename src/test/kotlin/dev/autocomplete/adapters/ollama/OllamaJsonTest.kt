@@ -27,4 +27,21 @@ class OllamaJsonTest {
         assertEquals("\"hi\\nthere\"", jsonString("hi\nthere"))
         assertEquals("\"a\\\"b\\\\c\"", jsonString("a\"b\\c"))
     }
+
+    @Test
+    fun `extractIntField reads prompt_eval_count`() {
+        val json = """{"response":"x","prompt_eval_count":123,"eval_count":42,"done":true}"""
+        assertEquals(123, extractIntField(json, "prompt_eval_count"))
+        assertEquals(42, extractIntField(json, "eval_count"))
+    }
+
+    @Test
+    fun `extractIntField returns 0 when field missing`() {
+        assertEquals(0, extractIntField("""{"response":"x"}""", "eval_count"))
+    }
+
+    @Test
+    fun `extractIntField tolerates whitespace and sign`() {
+        assertEquals(7, extractIntField("""{ "eval_count" :   7 }""", "eval_count"))
+    }
 }

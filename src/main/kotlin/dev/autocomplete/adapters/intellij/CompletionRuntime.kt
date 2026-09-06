@@ -23,10 +23,12 @@ class CompletionRuntime : Disposable {
 
     fun newService(): CompletionService {
         val settings = service<SettingsState>()
+        val tracker = service<TokenUsageTracker>()
         val client = OllamaLlmClient(
             endpointUrl = settings.endpointUrl,
             model = settings.model,
             http = http,
+            onUsage = { p, c -> tracker.record(p, c) },
         )
         return CompletionService(llmClient = client, settings = settings)
     }

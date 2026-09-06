@@ -26,6 +26,7 @@ class OllamaLlmClient(
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(3))
         .build(),
+    private val onUsage: (promptTokens: Int, completionTokens: Int) -> Unit = { _, _ -> },
 ) : LlmClient {
 
     override suspend fun complete(prompt: LlmPrompt, opts: LlmOptions): String {
@@ -42,7 +43,17 @@ class OllamaLlmClient(
                 "Ollama returned HTTP ${response.statusCode()}: ${response.body().take(200)}"
             )
         }
-        return extractResponseField(response.body())
+        val json = response.body()
+        val promptTokens = extractIntField(json, "prompt_eval_count")
+        val completionTokens = extractIntField(json, "eval_count")
+        if (promptTokens > 0 || completionTokens > 0) {
+            try {
+                onUsage(promptTokens, completionTokens)
+            } catch (_: Throwable) {
+                // Usage callback must never break a completion.
+            }
+        }
+        return extractResponseField(json)
     }
 
     private suspend fun sendAsync(request: HttpRequest): HttpResponse<String> =
@@ -119,6 +130,22 @@ internal fun extractResponseField(json: String): String {
         }
     }
     return out.toString()
+}
+
+/**
+ * Extract an integer value for a top-level numeric field (e.g. `"eval_count": 42`).
+ * Returns 0 if the field is missing or unparseable.
+ */
+internal fun extractIntField(json: String, fieldName: String): Int {
+    val key = "\"$fieldName\""
+    val keyIdx = json.indexOf(key)
+    if (keyIdx < 0) return 0
+    var i = keyIdx + key.length
+    while (i < json.length && (json[i].isWhitespace() || json[i] == ':')) i++
+    val start = i
+    if (i < json.length && (json[i] == '-' || json[i] == '+')) i++
+    while (i < json.length && json[i].isDigit()) i++
+    return if (i > start) json.substring(start, i).toIntOrNull() ?: 0 else 0
 }
 
 /** Minimal JSON string encoder — quotes and escapes only what JSON requires. */

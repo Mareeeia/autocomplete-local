@@ -2,6 +2,7 @@ package dev.autocomplete.adapters.intellij
 
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
@@ -15,6 +16,8 @@ class SettingsConfigurable : Configurable {
     private val maxTokensField = JBTextField()
     private val maxLinesField = JBTextField()
     private val enabledLangsField = JBTextField()
+    private val trackTokenUsageCheckBox = JBCheckBox("Track token usage")
+    private val tokenUsageReportEveryField = JBTextField()
 
     private var panel: JPanel? = null
 
@@ -29,6 +32,8 @@ class SettingsConfigurable : Configurable {
             .addLabeledComponent("Max tokens:", maxTokensField)
             .addLabeledComponent("Max lines:", maxLinesField)
             .addLabeledComponent("Enabled language IDs (CSV, blank = all):", enabledLangsField)
+            .addComponent(trackTokenUsageCheckBox)
+            .addLabeledComponent("Log token totals every N calls (0 = never):", tokenUsageReportEveryField)
             .addComponentFillVertically(JPanel(), 0)
             .panel
         panel = p
@@ -42,7 +47,9 @@ class SettingsConfigurable : Configurable {
             contextCharsField.text != s.contextChars.toString() ||
             maxTokensField.text != s.maxTokens.toString() ||
             maxLinesField.text != s.maxLines.toString() ||
-            enabledLangsField.text != s.enabledLanguageIdsCsv
+            enabledLangsField.text != s.enabledLanguageIdsCsv ||
+            trackTokenUsageCheckBox.isSelected != s.trackTokenUsage ||
+            tokenUsageReportEveryField.text != s.tokenUsageReportEvery.toString()
     }
 
     override fun apply() {
@@ -53,6 +60,8 @@ class SettingsConfigurable : Configurable {
         s.maxTokens = maxTokensField.text.trim().toIntOrNull()?.coerceAtLeast(1) ?: s.maxTokens
         s.maxLines = maxLinesField.text.trim().toIntOrNull()?.coerceAtLeast(1) ?: s.maxLines
         s.enabledLanguageIdsCsv = enabledLangsField.text.trim()
+        s.trackTokenUsage = trackTokenUsageCheckBox.isSelected
+        s.tokenUsageReportEvery = tokenUsageReportEveryField.text.trim().toIntOrNull() ?: s.tokenUsageReportEvery
     }
 
     override fun reset() {
@@ -71,5 +80,7 @@ class SettingsConfigurable : Configurable {
         maxTokensField.text = s.maxTokens.toString()
         maxLinesField.text = s.maxLines.toString()
         enabledLangsField.text = s.enabledLanguageIdsCsv
+        trackTokenUsageCheckBox.isSelected = s.trackTokenUsage
+        tokenUsageReportEveryField.text = s.tokenUsageReportEvery.toString()
     }
 }
