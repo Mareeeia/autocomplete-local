@@ -1,7 +1,7 @@
 package dev.autocomplete.adapters.intellij
 
+import com.intellij.codeInsight.inline.completion.DebouncedInlineCompletionProvider
 import com.intellij.codeInsight.inline.completion.InlineCompletionEvent
-import com.intellij.codeInsight.inline.completion.InlineCompletionProvider
 import com.intellij.codeInsight.inline.completion.InlineCompletionProviderID
 import com.intellij.codeInsight.inline.completion.InlineCompletionRequest
 import com.intellij.codeInsight.inline.completion.elements.InlineCompletionGrayTextElement
@@ -10,49 +10,63 @@ import com.intellij.codeInsight.inline.completion.suggestion.InlineCompletionSug
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import dev.autocomplete.adapters.ollama.OllamaLlmClient
-import dev.autocomplete.application.CompletionService
 import dev.autocomplete.domain.CompletionRequest
 import kotlinx.coroutines.CancellationException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
-class OllamaInlineCompletionProvider : InlineCompletionProvider {
+// Uses the platform's built-in DebouncedInlineCompletionProvider so rapid
+// keystrokes replace the in-flight request instead of racing it.
+class OllamaInlineCompletionProvider : DebouncedInlineCompletionProvider() {
 
     override val id: InlineCompletionProviderID =
         InlineCompletionProviderID("dev.autocomplete.ollama")
 
+    override suspend fun getDebounceDelay(request: InlineCompletionRequest): Duration =
+        150.milliseconds
+
     override fun isEnabled(event: InlineCompletionEvent): Boolean =
         event is InlineCompletionEvent.DocumentChange
 
-    override suspend fun getSuggestion(request: InlineCompletionRequest): InlineCompletionSuggestion {
-        val settings = service<SettingsState>()
-
+    override suspend fun getSuggestionDebounced(request: InlineCompletionRequest): InlineCompletionSuggestion {
         val (prefix, suffix, languageId) = readAction {
             val text = request.document.immutableCharSequence.toString()
             val offset = request.endOffset.coerceIn(0, text.length)
-            val lang = request.file.language.id
+            val lang = request.file?.language?.id
             Triple(text.substring(0, offset), text.substring(offset), lang)
         }
 
-        val service = CompletionService(
-            llmClient = OllamaLlmClient(endpointUrl = settings.endpointUrl, model = settings.model),
-            settings = settings,
+        val runtime = service<CompletionRuntime>()
+        val settings = service<SettingsState>()
+        val startNanos = System.nanoTime()
+        LOG.info(
+            "autocomplete request: lang=$languageId prefix=${prefix.length}c suffix=${suffix.length}c " +
+                "model=${settings.model}"
         )
 
         val response = try {
-            service.complete(CompletionRequest(prefix, suffix, languageId))
+            runtime.newService().complete(CompletionRequest(prefix, suffix, languageId))
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
-            LOG.warn("Local LLM autocomplete failed: ${t.message}")
+            LOG.warn("autocomplete failed after ${elapsedMs(startNanos)}ms: ${t.message}")
             return InlineCompletionSuggestion.Empty
         }
 
-        if (response.isEmpty) return InlineCompletionSuggestion.Empty
+        val elapsed = elapsedMs(startNanos)
+        if (response.isEmpty) {
+            LOG.info("autocomplete produced no suggestion (${elapsed}ms)")
+            return InlineCompletionSuggestion.Empty
+        }
 
+        LOG.info("autocomplete suggestion: ${response.text.length}c in ${elapsed}ms")
         return InlineCompletionSingleSuggestion.build {
             emit(InlineCompletionGrayTextElement(response.text))
         }
     }
+
+    private fun elapsedMs(startNanos: Long): Long =
+        (System.nanoTime() - startNanos) / 1_000_000
 
     private companion object {
         val LOG = logger<OllamaInlineCompletionProvider>()
