@@ -13,13 +13,55 @@ via **Install Plugin from Disk**. No JetBrains Marketplace account required.
   Community/Ultimate, PyCharm Community/Professional, WebStorm, GoLand,
   RubyMine, CLion, Rider, DataGrip, and any other IDE built on the IntelliJ
   Platform, since the plugin only depends on `com.intellij.modules.platform`.
-- **[Ollama](https://ollama.com)** running locally with the default model:
-  ```sh
-  ollama pull qwen2.5-coder:1.5b-base
-  ollama serve   # if it isn't already running as a service
-  ```
-  Any Ollama-hosted FIM-capable model works — set it in Settings after
+- **[Ollama](https://ollama.com)** running locally with the default model.
+  Any Ollama-hosted FIM-capable model works — set the name in Settings after
   installing.
+
+## Running Ollama with Homebrew (macOS)
+
+Install once:
+
+```sh
+brew install ollama
+ollama pull qwen2.5-coder:1.5b-base
+```
+
+Run it as a background service — starts on login, restarts on crash:
+
+```sh
+brew services start ollama       # start now, and on every login
+brew services stop  ollama       # stop and disable
+brew services restart ollama     # e.g. after upgrading
+brew services list | grep ollama # status: `started` / `stopped`
+```
+
+Or run it in the foreground of a terminal (dies when the terminal closes):
+
+```sh
+ollama serve
+```
+
+Quick health checks — both should return JSON:
+
+```sh
+curl -s http://localhost:11434/api/tags | jq       # models available
+curl -s http://localhost:11434/api/ps  | jq        # models currently loaded
+```
+
+Watch logs when using the service:
+
+```sh
+tail -f "$(brew --prefix)/var/log/ollama.log"
+```
+
+Model management:
+
+```sh
+ollama list                       # what you have pulled
+ollama pull <name>                # add/update
+ollama rm   <name>                # delete
+ollama run  qwen2.5-coder:1.5b-base   # quick interactive smoke test
+```
 
 ## Build the zip
 
